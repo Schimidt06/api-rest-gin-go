@@ -15,6 +15,7 @@ func HandleRequest() {
 
 func SetupRotas() *gin.Engine {
 	r := gin.Default()
+	r.LoadHTMLGlob("templates/*")
 	r.POST("/login", controllers.Login)
 
 	protected := r.Group("/")
@@ -29,6 +30,7 @@ func SetupRotas() *gin.Engine {
 	r.GET("/alunos", controllers.TodosAlunos)
 	r.GET("/alunos/:id", controllers.BuscarAlunoPorID)
 	r.GET("/alunos/cpf/:cpf", controllers.BuscaAlunoPorCPF)
+	r.GET("/index", controllers.ExibePaginaIndex)
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	return r
 }

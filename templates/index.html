@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Alunos</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2canvas and jspdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom styles for the ID card to ensure it looks good when printed */
+        #carteirinha-template {
+            width: 400px;
+            height: 250px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: 'Arial', sans-serif;
+            position: absolute; /* Off-screen */
+            left: -9999px;
+            top: 0;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .card-logo {
+            width: 50px;
+            height: 50px;
+            background-color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e3a8a;
+            font-weight: bold;
+            font-size: 24px;
+        }
+        .card-details p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .card-footer {
+            text-align: right;
+            font-size: 10px;
+            opacity: 0.8;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            padding-top: 5px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans antialiased min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-10 text-center">
+            <h1 class="text-4xl font-extrabold text-blue-500 mb-2">Gerenciamento de Alunos</h1>
+            <p class="text-gray-400">Gere carteirinhas escolares com facilidade</p>
+        </header>
+        
+        <main class="bg-gray-800 rounded-xl shadow-2xl p-6 border border-gray-700">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                <h2 class="text-2xl font-semibold text-white">Lista de Alunos</h2>
+                <span id="total-alunos" class="bg-blue-600 text-xs font-bold px-2 py-1 rounded-full">0</span>
+            </div>
+
+            <div id="alunos-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Alunos cards will be injected here -->
+                <div class="col-span-full text-center py-10">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                    <p class="mt-4 text-gray-400">Carregando alunos...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Hidden Template for html2canvas to capture -->
+    <div id="carteirinha-container">
+        <div id="carteirinha-template">
+            <div class="card-header">
+                <div class="card-logo">A</div>
+                <div>
+                    <h3 style="margin: 0; font-size: 20px; font-weight: bold;">Carteirinha Escolar</h3>
+                    <p style="margin: 0; font-size: 12px; opacity: 0.9;">Ano Letivo 2026</p>
+                </div>
+            </div>
+            <div class="card-details" style="margin-top: 20px;">
+                <p><strong>Nome:</strong> <span id="card-nome">Nome do Aluno</span></p>
+                <p><strong>CPF:</strong> <span id="card-cpf">000.000.000-00</span></p>
+                <p><strong>RG:</strong> <span id="card-rg">00.000.000-0</span></p>
+            </div>
+            <div class="card-footer">
+                <p>Documento intransferível. Válido em todo território nacional.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAlunos();
+        });
+
+        async function fetchAlunos() {
+            try {
+                const response = await fetch('/alunos');
+                if (!response.ok) throw new Error('Falha na comunicação com a API');
+                
+                const alunos = await response.json();
+                renderAlunos(alunos);
+            } catch (error) {
+                console.error('Erro:', error);
+                document.getElementById('alunos-list').innerHTML = `
+                    <div class="col-span-full text-center py-10">
+                        <p class="text-red-400 text-lg">⚠️ Erro ao carregar alunos.</p>
+                        <p class="text-sm text-gray-500">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderAlunos(alunos) {
+            const list = document.getElementById('alunos-list');
+            const total = document.getElementById('total-alunos');
+            
+            list.innerHTML = '';
+            total.innerText = alunos.length || 0;
+
+            if (!alunos || alunos.length === 0) {
+                list.innerHTML = `<p class="col-span-full text-center text-gray-500 py-10">Nenhum aluno cadastrado.</p>`;
+                return;
+            }
+
+            alunos.forEach(aluno => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-700 rounded-lg p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-gray-650 border border-gray-600 flex flex-col';
+                
+                card.innerHTML = `
+                    <div class="flex-grow">
+                        <div class="flex items-center mb-3">
+                            <div class="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-blue-300 font-bold mr-3">
+                                ${aluno.nome.charAt(0).toUpperCase()}
+                            </div>
+                            <h3 class="text-lg font-bold text-white truncate" title="${aluno.nome}">${aluno.nome}</h3>
+                        </div>
+                        <div class="space-y-1 text-sm text-gray-300 mb-4">
+                            <p><span class="text-gray-500">CPF:</span> ${formatCPF(aluno.cpf)}</p>
+                            <p><span class="text-gray-500">RG:</span> ${aluno.rg}</p>
+                        </div>
+                    </div>
+                    <button onclick='gerarCarteirinha(${JSON.stringify(aluno)})'
+                        class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition duration-200 transform hover:scale-[1.02] active:scale-[0.98]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Baixar Carteirinha</span>
+                    </button>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function formatCPF(cpf) {
+             // Simple formatter if CPF is raw digits
+             if(cpf && cpf.length === 11) {
+                 return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+             }
+             return cpf;
+        }
+
+        async function gerarCarteirinha(aluno) {
+            // Populate template
+            document.getElementById('card-nome').innerText = aluno.nome;
+            document.getElementById('card-cpf').innerText = formatCPF(aluno.cpf);
+            document.getElementById('card-rg').innerText = aluno.rg;
+
+            const element = document.getElementById('carteirinha-template');
+            
+            try {
+                // Generate canvas
+                const canvas = await html2canvas(element, {
+                    scale: 3, // High resolution
+                    useCORS: true,
+                    backgroundColor: null
+                });
+
+                // Generate PDF
+                const imgData = canvas.toDataURL('image/png');
+                
+                // Card dimensions in mm (approx standard id card size)
+                const cardWidthID1 = 85.6;
+                const cardHeightID1 = 53.98;
+
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: [cardWidthID1, cardHeightID1]
+                });
+
+                pdf.addImage(imgData, 'PNG', 0, 0, cardWidthID1, cardHeightID1);
+                
+                // Save
+                const cleanName = aluno.nome.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                pdf.save(`carteirinha_${cleanName}.pdf`);
+
+            } catch (err) {
+                console.error("Erro na geração do PDF:", err);
+                alert("Ocorreu um erro ao gerar a carteirinha. Tente novamente.");
+            }
+        }
+    </script>
+</body>
+</html>
