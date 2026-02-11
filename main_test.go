@@ -7,11 +7,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/guilhermeonrails/api-go-gin/database"
 	"github.com/guilhermeonrails/api-go-gin/models"
 	"github.com/guilhermeonrails/api-go-gin/routes"
@@ -26,6 +28,8 @@ func SetupDasRotasDeTeste() {
 	rotas := routes.SetupRotas()
 	r = rotas
 }
+
+// ... (existing code) ...
 
 func GeraTokenMock() string {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -89,16 +93,17 @@ func TestBuscandoAlunoPorCPFHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resposta.Code)
 }
 
-func TestBuscandoAlunoPorIDHandler(t *testing.T) {
+func TestBuscaAlunoPorIDHandler(t *testing.T) {
 	SetupBancoDeDados()
 	CriaAlunoMock()
 	defer DeletaAlunoMock()
-	SetupDasRotasDeTeste()
-	// Need to find the ID of the created student first or just rely on it being the first if DB is fresh
-	var aluno models.Aluno
-	database.DB.Where("cpf = ?", "12345678901").First(&aluno)
-	pathDaBusca := "/alunos/" + fmt.Sprint(aluno.ID)
 
+	SetupDasRotasDeTeste()
+
+	var aluno models.Aluno
+	database.DB.First(&aluno, "cpf = ?", "12345678901")
+
+	pathDaBusca := "/alunos/" + strconv.Itoa(int(aluno.ID))
 	req, _ := http.NewRequest("GET", pathDaBusca, nil)
 	resposta := httptest.NewRecorder()
 	r.ServeHTTP(resposta, req)
@@ -106,10 +111,20 @@ func TestBuscandoAlunoPorIDHandler(t *testing.T) {
 	var alunoMock models.Aluno
 	json.Unmarshal(resposta.Body.Bytes(), &alunoMock)
 
-	assert.Equal(t, "Nome do Aluno Teste", alunoMock.Nome)
+	assert.Equal(t, "Nome do Aluno Teste", alunoMock.Nome, "Os nomes devem ser iguais")
 	assert.Equal(t, "12345678901", alunoMock.CPF)
 	assert.Equal(t, "123456789", alunoMock.RG)
 	assert.Equal(t, http.StatusOK, resposta.Code)
+}
+
+func TestRotaNaoEncontrada(t *testing.T) {
+	SetupDasRotasDeTeste()
+
+	req, _ := http.NewRequest("GET", "/rota/que/nao/existe", nil)
+	resposta := httptest.NewRecorder()
+	r.ServeHTTP(resposta, req)
+
+	assert.Equal(t, http.StatusNotFound, resposta.Code)
 }
 
 func TestDeletandoAlunoHandler(t *testing.T) {

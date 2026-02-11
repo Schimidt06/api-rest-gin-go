@@ -179,3 +179,8 @@ func ExibePaginaIndex(c *gin.Context) {
 		"alunos": alunos,
 	})
 }
+
+// RotaNaoEncontrada exibe a página de erro 404
+func RotaNaoEncontrada(c *gin.Context) {
+	c.HTML(http.StatusNotFound, "404.html", nil)
+}
